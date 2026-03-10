@@ -3,6 +3,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { MevoModule } from './mevo/mevo.module';
+import { DatabaseModule } from './database/database.module';
 
 @Module({
   imports: [
@@ -10,6 +11,8 @@ import { MevoModule } from './mevo/mevo.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    MevoModule,
+    DatabaseModule,
   ],
   controllers: [AppController],
   providers: [AppService],
