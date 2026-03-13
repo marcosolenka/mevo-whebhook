@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from 'src/database/database.service';
+import * as oracledb from 'oracledb';
 
 @Controller('mevo')
 export class MevoController {
@@ -16,7 +17,6 @@ export class MevoController {
     private databaseService: DatabaseService,
   ) {}
 
-  // Função para validar o token
   private validarAutorizacao(auth: string) {
     if (!auth) {
       throw new UnauthorizedException('Authorization ausente');
@@ -40,6 +40,7 @@ export class MevoController {
     }
   }
 
+  // RECEBER RECEITA
   @Post('receita')
   @HttpCode(201)
   async receberReceita(
@@ -51,38 +52,77 @@ export class MevoController {
     const connection = await this.databaseService.getConnection();
 
     try {
-      const result = await connection.execute(`SELECT SYSDATE FROM DUAL`);
-      console.log('Conexão com banco OK:', result.rows);
+      const payload = JSON.stringify(body);
 
-      console.log('Receita recebida');
-      console.log(JSON.stringify(body, null, 2));
+      const result = await connection.execute(
+        `
+        BEGIN
+          INTG_MEVO.PKG_MEVO_API_TASY.CARGA_JSON(
+            P_PAYLOAD => :payload,
+            P_RETORNO => :retorno
+          );
+        END;
+        `,
+        {
+          payload: { val: payload, type: oracledb.CLOB },
+          retorno: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
+        },
+      );
 
-      // Aqui depois você coloca INSERT no banco
+      console.log('Receita processada:', result.outBinds);
+
+      return {
+        status: 'receita processada',
+        retorno: result.outBinds.retorno,
+      };
     } catch (error) {
       console.error('Erro ao processar receita:', error);
       throw error;
     } finally {
       await connection.close();
     }
-
-    return {
-      status: 'receita recebida',
-    };
   }
-  // Endpoint para cancelar receita
+
+  // CANCELAR RECEITA
   @Post('cancelar-receita')
   @HttpCode(201)
-  cancelarReceita(
+  async cancelarReceita(
     @Headers('authorization') auth: string,
-    @Body() body: { idPrescricao: number },
+    @Body() body: any,
   ) {
     this.validarAutorizacao(auth);
 
-    console.log('Cancelamento de receita recebido');
-    console.log(`ID da prescrição: ${body.idPrescricao}`);
+    const connection = await this.databaseService.getConnection();
 
-    // Aqui você pode adicionar lógica para cancelar a receita no sistema
+    try {
+      const payload = JSON.stringify(body);
 
-    return { status: 'receita cancelada', idPrescricao: body.idPrescricao };
+      const result = await connection.execute(
+        `
+        BEGIN
+          INTG_MEVO.PKG_MEVO_API_TASY.CANCELA_JSON(
+            P_PAYLOAD => :payload,
+            P_RETORNO => :retorno
+          );
+        END;
+        `,
+        {
+          payload: { val: payload, type: oracledb.CLOB },
+          retorno: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
+        },
+      );
+
+      console.log('Cancelamento processado:', result.outBinds);
+
+      return {
+        status: 'cancelamento processado',
+        retorno: result.outBinds.retorno,
+      };
+    } catch (error) {
+      console.error('Erro ao cancelar receita:', error);
+      throw error;
+    } finally {
+      await connection.close();
+    }
   }
 }
