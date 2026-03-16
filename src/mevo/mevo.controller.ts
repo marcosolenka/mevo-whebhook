@@ -9,6 +9,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from 'src/database/database.service';
 import * as oracledb from 'oracledb';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Controller('mevo')
 export class MevoController {
@@ -52,6 +54,7 @@ export class MevoController {
     const connection = await this.databaseService.getConnection();
 
     try {
+      this.salvarLog(auth, body);
       const payload = JSON.stringify(body);
 
       const result = await connection.execute(
@@ -95,6 +98,7 @@ export class MevoController {
     const connection = await this.databaseService.getConnection();
 
     try {
+      this.salvarLog(auth, body);
       const payload = JSON.stringify(body);
 
       const result = await connection.execute(
@@ -124,5 +128,25 @@ export class MevoController {
     } finally {
       await connection.close();
     }
+  }
+
+  private salvarLog(auth: string, body: any) {
+    const data = new Date();
+    const date = data.toISOString().split('T')[0];
+
+    const logDir = path.join(process.cwd(), 'logs');
+    const logFile = path.join(logDir, `webhook-${date}.log`);
+
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+
+    const log = {
+      timestamp: data.toISOString(),
+      authorization: auth,
+      body: body,
+    };
+
+    fs.appendFileSync(logFile, JSON.stringify(log) + '\n');
   }
 }
